@@ -32,7 +32,7 @@ ALLOWED_ROLES = [1358163292220293356, 1358654187705204798, 1358163292220293354, 
 TICKET_MESSAGE = "Click the button below to open a support ticket."
 
 # Replace with your private support channel ID
-TICKET_PRIVATE_CHANNEL_ID = 123456789012345678  # <- CHANGE THIS
+TICKET_PRIVATE_CHANNEL_ID = 1368370307320254486  # <- CHANGE THIS
 
 class TicketView(ui.View):
     def __init__(self):
