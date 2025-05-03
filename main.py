@@ -59,14 +59,25 @@ class TicketView(ui.View):
             type=discord.ChannelType.private_thread,
             invitable=False
         )
+        # Add ticket creator
         await thread.add_user(interaction.user)
-
+        
+        # Add mods/admins silently
         for member in interaction.guild.members:
             if any(role.id in MODERATOR_ROLE_IDS for role in member.roles):
                 try:
                     await thread.add_user(member)
                 except discord.Forbidden:
                     continue
+        
+        # Try deleting any system messages like "X added to thread"
+        async for msg in thread.history(limit=10):
+            if msg.type in [discord.MessageType.user_join, discord.MessageType.thread_created]:
+                try:
+                    await msg.delete()
+                except discord.Forbidden:
+                    continue
+
 
         await thread.send(
             f"{interaction.user.mention}, your ticket has been created.",
