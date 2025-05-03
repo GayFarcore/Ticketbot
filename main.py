@@ -1,8 +1,24 @@
+import os
 import discord
 from discord.ext import commands
 from discord import app_commands, ui, Interaction, Thread
+from flask import Flask
+import threading
 import asyncio
-import os
+
+# --- Keep-alive web server for Render ---
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Bot is alive!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
+
+web_thread = threading.Thread(target=run_web)
+web_thread.start()
+# ----------------------------------------
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -10,7 +26,7 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-MODERATOR_ROLES = ["Mod", "Admin"]
+MODERATOR_ROLES = [1358163292220293356, 1358654187705204798, 1358163292220293354, 1358163292182413419, 1359044764804055130, 1358163292182413418]
 TICKET_MESSAGE = "Click the button below to open a support ticket."
 
 class TicketView(ui.View):
@@ -48,8 +64,8 @@ class CloseView(ui.View):
     @ui.button(label="Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
     async def close_ticket(self, interaction: Interaction, button: ui.Button):
         if isinstance(interaction.channel, Thread):
-            await interaction.channel.send("Closing ticket in 5 seconds...")
-            await asyncio.sleep(5)
+            await interaction.channel.send("Closing ticket in 3 seconds...")
+            await asyncio.sleep(3)
             await interaction.channel.delete()
         else:
             await interaction.response.send_message("This command can only be used in a ticket thread.", ephemeral=True)
