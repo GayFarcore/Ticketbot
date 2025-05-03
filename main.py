@@ -27,25 +27,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Use correct name and make it global
-MODERATOR_ROLE_IDS = [
-    1358163292220293356, 1358654187705204798, 1358163292220293354,
-    1358163292182413419, 1359044764804055130, 1358163292182413418,
-    1358163292220293357
-]
-
-class CloseView(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @ui.button(label="Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
-    async def close_ticket(self, interaction: Interaction, button: ui.Button):
-        if isinstance(interaction.channel, Thread):
-            await interaction.channel.send("Closing ticket in 3 seconds...")
-            await asyncio.sleep(3)
-            await interaction.channel.delete()
-        else:
-            await interaction.response.send_message("This can only be used inside a ticket thread.", ephemeral=True)
+TICKET_MESSAGE = "Click the button below to open a support ticket."
 
 class TicketView(ui.View):
     def __init__(self):
@@ -54,48 +36,53 @@ class TicketView(ui.View):
     @ui.button(label="Open Ticket", style=discord.ButtonStyle.green, custom_id="open_ticket")
     async def open_ticket(self, interaction: Interaction, button: ui.Button):
         thread_name = f"ticket-{interaction.user.name}"
+
+        # Create the private thread
         thread = await interaction.channel.create_thread(
             name=thread_name,
             type=discord.ChannelType.private_thread,
             invitable=False
         )
-        # Add ticket creator
+
+        # Add only the user who opened the ticket
         await thread.add_user(interaction.user)
-        
-        # Add mods/admins silently
-        for member in interaction.guild.members:
-            if any(role.id in MODERATOR_ROLE_IDS for role in member.roles):
-                try:
-                    await thread.add_user(member)
-                except discord.Forbidden:
-                    continue
-        
-        # Try deleting any system messages like "X added to thread"
-        async for msg in thread.history(limit=10):
-            if msg.type in [discord.MessageType.user_join, discord.MessageType.thread_created]:
+
+        # Clean up system message (user_join)
+        async for msg in thread.history(limit=5):
+            if msg.type == discord.MessageType.user_join:
                 try:
                     await msg.delete()
                 except discord.Forbidden:
-                    continue
-
+                    pass
 
         await thread.send(
             f"{interaction.user.mention}, your ticket has been created.",
             view=CloseView()
         )
-        await interaction.response.send_message(f"✅ Ticket created: {thread.mention}", ephemeral=True)
+        await interaction.response.send_message(f"🎫 Ticket created: {thread.mention}", ephemeral=True)
+
+class CloseView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(label="Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
+    async def close_ticket(self, interaction: Interaction, button: ui.Button):
+        if isinstance(interaction.channel, Thread):
+            await interaction.channel.send("Ticket will close in 3 seconds...")
+            await asyncio.sleep(3)
+            await interaction.channel.delete()
+        else:
+            await interaction.response.send_message("This can only be used in a ticket thread.", ephemeral=True)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    # Register persistent views
-    bot.add_view(TicketView())
     print(f"✅ Bot is ready as {bot.user}")
 
 @bot.tree.command(name="setup_ticket")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_ticket(interaction: Interaction, message: str):
     await interaction.channel.send(message, view=TicketView())
-    await interaction.response.send_message("✅ Ticket system initialized.", ephemeral=True)
+    await interaction.response.send_message("Ticket system initialized.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
