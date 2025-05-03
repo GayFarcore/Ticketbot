@@ -43,9 +43,8 @@ class TicketView(ui.View):
         )
         await thread.add_user(interaction.user)
 
-        allowed_roles = [role for role in interaction.guild.roles if role.name in MODERATOR_ROLES]
         for member in interaction.guild.members:
-            if any(role in member.roles for role in allowed_roles):
+            if any(role.id in MODERATOR_ROLE_IDS for role in member.roles):
                 try:
                     await thread.add_user(member)
                 except:
