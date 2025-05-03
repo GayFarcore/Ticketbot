@@ -31,30 +31,38 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ALLOWED_ROLES = [1358163292220293356, 1358654187705204798, 1358163292220293354, 1358163292182413419, 1359044764804055130, 1358163292182413418, 1358163292220293357]
 TICKET_MESSAGE = "Click the button below to open a support ticket."
 
+# Replace with your private support channel ID
+TICKET_PRIVATE_CHANNEL_ID = 123456789012345678  # <- CHANGE THIS
+
 class TicketView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @ui.button(label="Open Ticket", style=discord.ButtonStyle.green, custom_id="open_ticket")
     async def open_ticket(self, interaction: Interaction, button: ui.Button):
+        guild = interaction.guild
+        target_channel = guild.get_channel(TICKET_PRIVATE_CHANNEL_ID)
+
+        if not target_channel:
+            await interaction.response.send_message("❌ Ticket system error: private channel not found.", ephemeral=True)
+            return
+
         thread_name = f"ticket-{interaction.user.name}"
 
-        # Create private thread in current channel (should be a locked #tickets channel)
-        thread = await interaction.channel.create_thread(
+        # Create a private thread in the specified private channel
+        thread = await target_channel.create_thread(
             name=thread_name,
             type=discord.ChannelType.private_thread,
             invitable=False
         )
         await thread.add_user(interaction.user)
 
-        # Send initial message with close button
         await thread.send(
             f"{interaction.user.mention}, your ticket has been created.",
             view=CloseView()
         )
 
-        # Respond to button press privately
-        await interaction.response.send_message(f"Ticket created: {thread.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Ticket created: {thread.mention}", ephemeral=True)
 
 class CloseView(ui.View):
     def __init__(self):
@@ -66,13 +74,11 @@ class CloseView(ui.View):
             await interaction.response.send_message("Closing ticket in 3 seconds...", ephemeral=True)
             await asyncio.sleep(3)
 
-            # Remove user
             try:
                 await interaction.channel.remove_user(interaction.user)
             except:
                 pass
 
-            # Archive & lock thread
             await interaction.channel.edit(archived=True, locked=True)
         else:
             await interaction.response.send_message("This can only be used in a ticket thread.", ephemeral=True)
