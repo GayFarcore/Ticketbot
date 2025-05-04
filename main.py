@@ -28,13 +28,16 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-TICKET_MESSAGE = "Click the button below to open a support ticket."
-LOG_CHANNEL_ID = 1368483776149323816  # Replace with your actual log channel ID
+LOG_CHANNEL_ID = 1368483776149323816  # Replace with your log channel ID
 
+
+# --- Util: Thread naming sanitation ---
 def sanitize_title(title: str) -> str:
     title = re.sub(r"[^\w\s-]", "", title)
     return title.strip().replace(" ", "-")[:80]
 
+
+# --- View for closing a ticket ---
 class CloseView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -44,7 +47,7 @@ class CloseView(ui.View):
         if isinstance(interaction.channel, Thread):
             thread: Thread = interaction.channel
 
-            # Collect all users who sent a message in the thread
+            # Collect all users who sent a message
             participants = set()
             async for msg in thread.history(limit=None):
                 participants.add(msg.author)
@@ -59,11 +62,13 @@ class CloseView(ui.View):
                     except discord.Forbidden:
                         pass
 
-            await thread.send("✅ Ticket closed. Only staff can view this now.")
-            await interaction.response.send_message("Ticket closed for non-staff users.", ephemeral=True)
+            await thread.send("✅ Ticket closed. Only staff can view this thread.")
+            await interaction.response.send_message("Closed the ticket for non-staff users.", ephemeral=True)
         else:
-            await interaction.response.send_message("This button only works inside ticket threads.", ephemeral=True)
+            await interaction.response.send_message("❌ This button must be used inside a ticket thread.", ephemeral=True)
 
+
+# --- Modal for reason input ---
 class TicketReasonModal(ui.Modal, title="Open a Ticket"):
     reason = ui.TextInput(
         label="Why are you opening a ticket?",
@@ -80,7 +85,7 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
         thread_name = sanitize_title(self.reason.value[:50])
         thread_title = f"ticket-{thread_name}"
 
-        # Create thread
+        # Create private thread
         thread = await self.origin_interaction.channel.create_thread(
             name=thread_title,
             type=discord.ChannelType.private_thread,
@@ -90,7 +95,7 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
         # Add user
         await thread.add_user(self.user)
 
-        # Send the initial ticket message in the thread
+        # Send message in thread with close button
         await thread.send(
             embed=discord.Embed(
                 title="🎫 New Ticket",
@@ -100,17 +105,17 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
             view=CloseView()
         )
 
-        # Confirm to user
+        # Ephemeral response to user
         await interaction.response.send_message(
-            f"🎫 Your ticket has been created: {thread.mention}",
+            f"✅ Your ticket has been created: {thread.mention}",
             ephemeral=True
         )
 
-        # Log ticket creation
+        # Log to ticket log channel
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         if log_channel:
             embed = discord.Embed(
-                title="🆕 Ticket Opened",
+                title="📥 Ticket Opened",
                 description=(
                     f"**User:** {self.user.mention}\n"
                     f"**Reason:** {self.reason.value}\n"
@@ -121,6 +126,8 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
             embed.set_footer(text=f"User ID: {self.user.id}")
             await log_channel.send(embed=embed)
 
+
+# --- View for opening a ticket ---
 class TicketView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -129,11 +136,17 @@ class TicketView(ui.View):
     async def open_ticket(self, interaction: Interaction, button: ui.Button):
         await interaction.response.send_modal(TicketReasonModal(interaction.user, interaction))
 
+
+# --- On bot ready: sync commands + register persistent views ---
 @bot.event
 async def on_ready():
     await bot.tree.sync()
+    bot.add_view(TicketView())
+    bot.add_view(CloseView())  # Ensures button works across restarts
     print(f"✅ Bot is ready as {bot.user}")
 
+
+# --- Setup command for admin ---
 @bot.tree.command(name="setup_ticket")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_ticket(interaction: Interaction, message: str):
@@ -144,5 +157,6 @@ async def setup_ticket(interaction: Interaction, message: str):
     )
     await interaction.channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message("✅ Ticket system initialized.", ephemeral=True)
+
 
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
