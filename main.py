@@ -27,12 +27,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Customize this with your mod/admin role IDs
-ALLOWED_ROLES = [1358163292220293356, 1358654187705204798, 1358163292220293354, 1358163292182413419, 1359044764804055130, 1358163292182413418, 1358163292220293357]
 TICKET_MESSAGE = "Click the button below to open a support ticket."
-
-# Replace with your private support channel ID
-TICKET_PRIVATE_CHANNEL_ID = 1368370307320254486  # <- CHANGE THIS
 
 class TicketView(ui.View):
     def __init__(self):
@@ -40,29 +35,31 @@ class TicketView(ui.View):
 
     @ui.button(label="Open Ticket", style=discord.ButtonStyle.green, custom_id="open_ticket")
     async def open_ticket(self, interaction: Interaction, button: ui.Button):
-        guild = interaction.guild
-        target_channel = guild.get_channel(TICKET_PRIVATE_CHANNEL_ID)
-
-        if not target_channel:
-            await interaction.response.send_message("❌ Ticket system error: private channel not found.", ephemeral=True)
-            return
-
         thread_name = f"ticket-{interaction.user.name}"
 
-        # Create a private thread in the specified private channel
-        thread = await target_channel.create_thread(
+        # Create the private thread
+        thread = await interaction.channel.create_thread(
             name=thread_name,
             type=discord.ChannelType.private_thread,
             invitable=False
         )
+
+        # Add only the user who opened the ticket
         await thread.add_user(interaction.user)
+
+        # Clean up system message (user_join)
+        async for msg in thread.history(limit=5):
+            if msg.type == discord.MessageType.user_join:
+                try:
+                    await msg.delete()
+                except discord.Forbidden:
+                    pass
 
         await thread.send(
             f"{interaction.user.mention}, your ticket has been created.",
             view=CloseView()
         )
-
-        await interaction.response.send_message(f"✅ Ticket created: {thread.mention}", ephemeral=True)
+        await interaction.response.send_message(f"🎫 Ticket created: {thread.mention}", ephemeral=True)
 
 class CloseView(ui.View):
     def __init__(self):
@@ -71,22 +68,16 @@ class CloseView(ui.View):
     @ui.button(label="Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
     async def close_ticket(self, interaction: Interaction, button: ui.Button):
         if isinstance(interaction.channel, Thread):
-            await interaction.response.send_message("Closing ticket in 3 seconds...", ephemeral=True)
+            await interaction.channel.send("Ticket will close in 3 seconds...")
             await asyncio.sleep(3)
-
-            try:
-                await interaction.channel.remove_user(interaction.user)
-            except:
-                pass
-
-            await interaction.channel.edit(archived=True, locked=True)
+            await interaction.channel.delete()
         else:
             await interaction.response.send_message("This can only be used in a ticket thread.", ephemeral=True)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"Bot is ready as {bot.user}")
+    print(f"✅ Bot is ready as {bot.user}")
 
 @bot.tree.command(name="setup_ticket")
 @app_commands.checks.has_permissions(administrator=True)
