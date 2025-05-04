@@ -113,7 +113,7 @@ async def on_ready():
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_ticket(interaction: Interaction, message: str):
     embed = discord.Embed(
-        title="🎟️ Support Ticket",
+        title="🎟️ Support Tickets",
         description=message,
         color=discord.Color.blurple()
     )
