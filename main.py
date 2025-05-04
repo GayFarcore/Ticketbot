@@ -29,7 +29,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 TICKET_MESSAGE = "Click the button below to open a support ticket."
-LOG_CHANNEL_ID = 1368483776149323816  # 🔁 Replace this with your log channel ID
+LOG_CHANNEL_ID = 1368483776149323816  # Replace with your actual log channel ID
 
 def sanitize_title(title: str) -> str:
     title = re.sub(r"[^\w\s-]", "", title)
@@ -44,12 +44,11 @@ class CloseView(ui.View):
         if isinstance(interaction.channel, Thread):
             thread: Thread = interaction.channel
 
-            # Collect all users who spoke
+            # Collect all users who sent a message in the thread
             participants = set()
             async for msg in thread.history(limit=None):
                 participants.add(msg.author)
 
-            # Remove all non-admin human users
             for user in participants:
                 if user.bot:
                     continue
@@ -61,9 +60,9 @@ class CloseView(ui.View):
                         pass
 
             await thread.send("✅ Ticket closed. Only staff can view this now.")
-            await interaction.response.send_message("Ticket closed for all non-admins.", ephemeral=True)
+            await interaction.response.send_message("Ticket closed for non-staff users.", ephemeral=True)
         else:
-            await interaction.response.send_message("This can only be used in a ticket thread.", ephemeral=True)
+            await interaction.response.send_message("This button only works inside ticket threads.", ephemeral=True)
 
 class TicketReasonModal(ui.Modal, title="Open a Ticket"):
     reason = ui.TextInput(
@@ -81,7 +80,7 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
         thread_name = sanitize_title(self.reason.value[:50])
         thread_title = f"ticket-{thread_name}"
 
-        # Create private thread
+        # Create thread
         thread = await self.origin_interaction.channel.create_thread(
             name=thread_title,
             type=discord.ChannelType.private_thread,
@@ -91,15 +90,7 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
         # Add user
         await thread.add_user(self.user)
 
-        # Clean join messages
-        async for msg in thread.history(limit=5):
-            if msg.type == discord.MessageType.user_join:
-                try:
-                    await msg.delete()
-                except discord.Forbidden:
-                    pass
-
-        # Send initial message in the thread
+        # Send the initial ticket message in the thread
         await thread.send(
             embed=discord.Embed(
                 title="🎫 New Ticket",
@@ -109,7 +100,7 @@ class TicketReasonModal(ui.Modal, title="Open a Ticket"):
             view=CloseView()
         )
 
-        # Send ephemeral confirmation
+        # Confirm to user
         await interaction.response.send_message(
             f"🎫 Your ticket has been created: {thread.mention}",
             ephemeral=True
